@@ -121,6 +121,10 @@ ffmpeg -f avfoundation -list_devices true -i ""
 3. A job is queued; the **main thread** (where the model was loaded) transcribes with `mlx_whisper`.
 4. The text is piped to `pbcopy` and a done sound plays.
 
+## References
+
+- MLX Whisper (Apple MLX examples): https://github.com/ml-explore/mlx-examples/tree/main/whisper
+
 ## License
 
 MIT
