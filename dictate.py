@@ -1,3 +1,4 @@
+import argparse
 import os
 import queue
 import signal
@@ -62,10 +63,10 @@ def stop_recording():
     return _audio_path
 
 
-def transcribe(path):
+def transcribe(path, model=large_model):
     result = mlx_whisper.transcribe(
         path,
-        path_or_hf_repo=large_model,
+        path_or_hf_repo=model,
         language=LANGUAGE,
     )
     return result["text"].strip()
@@ -123,6 +124,16 @@ def on_toggle():
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Local MLX Whisper dictation on Apple Silicon."
+    )
+    parser.add_argument("--file", help="transcribe an audio file and exit (no microphone)")
+    args = parser.parse_args()
+
+    if args.file:
+        print(transcribe(args.file))
+        return
+
     print(f"loading {large_model} ...", flush=True)
     ModelHolder.get_model(large_model, mx.float16)
     print(f"ready. hotkey: {HOTKEY}  (Ctrl+C to quit)", flush=True)

@@ -41,6 +41,16 @@ Wait for `ready. hotkey: <ctrl>+<alt>+<space>` (the first run downloads the mode
 
 `Ctrl+C` in the terminal quits.
 
+### Transcribe a file (no microphone)
+
+Use `--file` to run the pipeline on an existing audio file — handy for testing or for anyone evaluating the repo without granting mic permissions:
+
+```sh
+uv run dictate.py --file samples/hello.wav
+```
+
+Tip: for a quick first test, point `large_model` at `mlx-community/whisper-tiny-mlx` so it doesn't download ~3 GB.
+
 ## macOS permissions
 
 Two permissions are required, granted to **the app that launches the script** (Terminal, iTerm, VS Code, …):
@@ -63,7 +73,7 @@ Edit the constants at the top of `dictate.py`:
 
 | Constant | Default | Notes |
 |---|---|---|
-| model | `mlx-community/whisper-large-v3-mlx` | any `mlx-community` MLX Whisper repo |
+| `large_model` | `mlx-community/whisper-large-v3-mlx` | any `mlx-community` MLX Whisper repo |
 | `DEVICE` | `:1` | ffmpeg `avfoundation` input index |
 | `HOTKEY` | `<ctrl>+<alt>+<space>` | `pynput` syntax (`<alt>` = Option) |
 | `LANGUAGE` | `None` | e.g. `"en"`; `None` auto-detects |
