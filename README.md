@@ -1,5 +1,9 @@
 # mlx-dictate
 
+<p align="center">
+  <img src="assets/banner_2.png" alt="mlx-dictate" width="120">
+</p>
+
 Push-to-talk dictation for **macOS on Apple Silicon**. Press a global hotkey, speak, press it again — the transcript is copied to your clipboard. Everything runs **locally on the GPU** via [MLX Whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper). No cloud, no API keys.
 
 ## Features
