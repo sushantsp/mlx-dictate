@@ -49,7 +49,7 @@ Use `--file` to run the pipeline on an existing audio file — handy for testing
 uv run dictate.py --file samples/hello.wav
 ```
 
-Tip: for a quick first test, point `large_model` at `mlx-community/whisper-tiny-mlx` so it doesn't download ~3 GB.
+Tip: for a quick first test, pass `--model mlx-community/whisper-tiny-mlx` so it doesn't download ~3 GB.
 
 ## macOS permissions
 
@@ -69,14 +69,23 @@ Grant them in **System Settings → Privacy & Security → Accessibility** and *
 
 ## Configuration
 
-Edit the constants at the top of `dictate.py`:
+Everything lives in **`config.py`** — no need to edit `dictate.py`:
 
 | Constant | Default | Notes |
 |---|---|---|
-| `large_model` | `mlx-community/whisper-large-v3-mlx` | any `mlx-community` MLX Whisper repo |
+| `MODEL` | `mlx-community/whisper-large-v3-mlx` | any `mlx-community` MLX Whisper repo |
 | `DEVICE` | `:1` | ffmpeg `avfoundation` input index |
 | `HOTKEY` | `<ctrl>+<alt>+<space>` | `pynput` syntax (`<alt>` = Option) |
 | `LANGUAGE` | `None` | e.g. `"en"`; `None` auto-detects |
+| `SOUND_START` / `SOUND_DONE` / `SOUND_ERROR` | system `.aiff` files | sound cues |
+
+You can also override the model per-run without touching the config:
+
+```sh
+uv run dictate.py --model mlx-community/whisper-small-mlx
+```
+
+Precedence: **CLI `--model` > `config.py`**.
 
 Find your mic device index:
 

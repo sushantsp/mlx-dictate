@@ -11,19 +11,9 @@ import mlx_whisper
 from mlx_whisper.transcribe import ModelHolder
 from pynput import keyboard
 
-# MODEL = "mlx-community/whisper-small-mlx"
-# tiny_model = 'mlx-community/whisper-tiny-mlx'
-# base_model = 'mlx-community/whisper-base-mlx'
-# small_model = 'mlx-community/whisper-small-mlx'
-# turbo_model = 'mlx-community/whisper-large-v3-turbo'
-large_model = 'mlx-community/whisper-large-v3-mlx'
-DEVICE = ":1"
-HOTKEY = "<ctrl>+<alt>+<space>"
-LANGUAGE = None
+import config
 
-SOUND_START = "/System/Library/Sounds/Pop.aiff"
-SOUND_DONE = "/System/Library/Sounds/Glass.aiff"
-SOUND_ERROR = "/System/Library/Sounds/Basso.aiff"
+_active_model = config.MODEL
 
 _lock = threading.Lock()
 _state = "idle"
@@ -48,7 +38,7 @@ def start_recording():
     _proc = subprocess.Popen(
         [
             "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-            "-f", "avfoundation", "-i", DEVICE,
+            "-f", "avfoundation", "-i", config.DEVICE,
             "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le",
             path,
         ],
@@ -63,11 +53,11 @@ def stop_recording():
     return _audio_path
 
 
-def transcribe(path, model=large_model):
+def transcribe(path, model=None):
     result = mlx_whisper.transcribe(
         path,
-        path_or_hf_repo=model,
-        language=LANGUAGE,
+        path_or_hf_repo=model or _active_model,
+        language=config.LANGUAGE,
     )
     return result["text"].strip()
 
@@ -86,13 +76,13 @@ def finish():
         if text:
             copy_to_clipboard(text)
             print(f"{text}\n[copied to clipboard]", flush=True)
-            play(SOUND_DONE)
+            play(config.SOUND_DONE)
         else:
             print("(nothing recognized)", flush=True)
-            play(SOUND_ERROR)
+            play(config.SOUND_ERROR)
     except Exception as exc:
         print(f"error: {exc}", flush=True)
-        play(SOUND_ERROR)
+        play(config.SOUND_ERROR)
     finally:
         if path and os.path.exists(path):
             os.remove(path)
@@ -116,7 +106,7 @@ def on_toggle():
 
     if starting:
         start_recording()
-        play(SOUND_START)
+        play(config.SOUND_START)
         print("recording... (press hotkey again to stop)", flush=True)
     else:
         print("stopped, working...", flush=True)
@@ -124,21 +114,27 @@ def on_toggle():
 
 
 def main():
+    global _active_model
+
     parser = argparse.ArgumentParser(
         description="Local MLX Whisper dictation on Apple Silicon."
     )
     parser.add_argument("--file", help="transcribe an audio file and exit (no microphone)")
+    parser.add_argument("--model", help="override the model from config.py")
     args = parser.parse_args()
+
+    if args.model:
+        _active_model = args.model
 
     if args.file:
         print(transcribe(args.file))
         return
 
-    print(f"loading {large_model} ...", flush=True)
-    ModelHolder.get_model(large_model, mx.float16)
-    print(f"ready. hotkey: {HOTKEY}  (Ctrl+C to quit)", flush=True)
+    print(f"loading {_active_model} ...", flush=True)
+    ModelHolder.get_model(_active_model, mx.float16)
+    print(f"ready. hotkey: {config.HOTKEY}  (Ctrl+C to quit)", flush=True)
 
-    listener = keyboard.GlobalHotKeys({HOTKEY: on_toggle})
+    listener = keyboard.GlobalHotKeys({config.HOTKEY: on_toggle})
     listener.start()
     try:
         while listener.is_alive():
