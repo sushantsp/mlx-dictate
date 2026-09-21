@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TS Anomaly Service — Architecture Explorer</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2129; --border:#30363d;
+    --text:#e6edf3; --muted:#8b949e; --green:#3fb950; --lgreen:#7ee787;
+    --amber:#d29922; --red:#f85149; --blue:#58a6ff;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;padding-bottom:80px}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+  header{padding:48px 0 8px}
+  header h1{margin:0 0 6px;font-size:26px;letter-spacing:-.5px}
+  header p{margin:0;color:var(--muted)}
+  .tagchips{margin-top:10px}
+  .tag{display:inline-block;font:11px var(--mono);color:var(--muted);border:1px solid var(--border);border-radius:99px;padding:2px 10px;margin:0 6px 6px 0}
+  nav{position:sticky;top:0;z-index:50;background:rgba(13,17,23,.92);backdrop-filter:blur(6px);border-bottom:1px solid var(--border);margin-top:28px}
+  nav .wrap{display:flex;gap:4px;flex-wrap:wrap;padding:8px 20px}
+  nav a{color:var(--muted);text-decoration:none;font-size:12.5px;padding:4px 10px;border-radius:6px}
+  nav a:hover{color:var(--text);background:var(--panel2)}
+  section{padding:44px 0 6px}
+  h2{font-size:19px;margin:0 0 4px;letter-spacing:-.3px}
+  h2 .secno{color:var(--green);font:12px var(--mono);vertical-align:2px;margin-right:8px}
+  .sub{color:var(--muted);margin:0 0 18px;font-size:13px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px}
+  .muted{color:var(--muted)}
+  .btn{background:#21262d;border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px}
+  .btn:hover{border-color:var(--green)}
+  .btn:disabled{opacity:.4;cursor:default}
+  .btn.primary{border-color:var(--green);color:var(--lgreen)}
+  .btn.danger{border-color:var(--red);color:#ff7b72}
+  .btn.active{border-color:var(--green);color:var(--lgreen)}
+  .ctl .spacer{flex:1 1 auto}
+  .stepmode{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);cursor:pointer;user-select:none;white-space:nowrap}
+  .stepmode input{accent-color:var(--green);cursor:pointer;margin:0}
+  @keyframes npulse{0%,100%{box-shadow:0 0 0 0 rgba(63,185,80,.5)}50%{box-shadow:0 0 0 8px rgba(63,185,80,0)}}
+  .btn.pulse{animation:npulse 1.3s infinite}
+
+  /* ---- flow diagram ---- */
+  .stagebox{overflow-x:auto;background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:6px}
+  #stage{display:block;min-width:880px;width:100%;height:auto}
+  .node{cursor:pointer}
+  .node rect{fill:#1c2129;stroke:#30363d;stroke-width:1.5;transition:.25s}
+  .node:hover rect{stroke:#58a6ff}
+  .node.lit rect{stroke:var(--green);stroke-width:2.5;filter:drop-shadow(0 0 7px rgba(63,185,80,.55))}
+  .node.crashed rect{stroke:var(--red);stroke-width:2.5;filter:drop-shadow(0 0 7px rgba(248,81,73,.55))}
+  .node.sel rect{stroke:var(--blue);stroke-width:2.5}
+  .ntitle{fill:var(--text);font-size:15px;font-weight:600;text-anchor:middle}
+  .nsub{fill:var(--muted);font-size:10.5px;text-anchor:middle}
+  .nstep{fill:#7ee787;font:10.5px var(--mono);text-anchor:middle}
+  .arrow{stroke:#8b949e;stroke-width:1.5;fill:none}
+  .alabel{fill:var(--muted);font-size:10px;text-anchor:middle}
+  .qdot{fill:#7ee787;opacity:.65}
+  .cap{min-height:46px;padding:11px 14px;border-left:3px solid var(--green);background:var(--panel2);border-radius:6px;font:12.5px var(--mono);margin-top:12px}
+  .cap.warn{border-color:var(--amber)}
+  .cap.err{border-color:var(--red)}
+  .ctl{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center}
+  .ndet{margin-top:14px}
+  .ndet h4{margin:0 0 6px;font-size:13.5px;color:var(--blue)}
+  .ndet p{margin:0;font-size:13px;color:var(--muted)}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:10px}
+
+  /* ---- stepper ---- */
+  .st-top{display:flex;gap:12px;align-items:baseline;margin-bottom:8px}
+  #st-count{font:12px var(--mono);color:var(--green);border:1px solid var(--border);border-radius:6px;padding:2px 8px}
+  #st-title{font-size:15.5px}
+  #st-body{font-size:13.5px}
+  .risk{font-size:12.5px;color:var(--amber);border-left:3px solid var(--amber);padding:6px 10px;background:var(--panel2);border-radius:4px}
+  .st-nav{display:flex;gap:10px;margin-top:14px}
+  .stdots{display:flex;gap:6px;margin-top:14px}
+  .stdot{width:10px;height:10px;border-radius:50%;border:1px solid var(--border);background:transparent;cursor:pointer;padding:0}
+  .stdot.on{background:var(--green);border-color:var(--green)}
+
+  /* ---- cards / grids ---- */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px}
+  .card h3{margin:0 0 4px;font-size:14.5px}
+  .card .tagline{color:var(--muted);font-size:12px;margin:0 0 10px}
+  .card ul{margin:0;padding-left:18px;font-size:13px}
+  .card li{margin-bottom:5px}
+  .card.good{border-color:rgba(63,185,80,.45)}
+  .card.good h3{color:var(--lgreen)}
+  .card.bad h3{color:#ff7b72}
+  .pill{display:inline-block;font:10.5px var(--mono);color:var(--muted);border:1px solid var(--border);border-radius:99px;padding:1px 9px;margin-bottom:8px}
+  .pill.g{color:var(--lgreen);border-color:rgba(63,185,80,.4)}
+  .pill.a{color:var(--amber);border-color:rgba(210,153,34,.4)}
+  .pill.r{color:#ff7b72;border-color:rgba(248,81,73,.4)}
+  .pill.b{color:var(--blue);border-color:rgba(88,166,255,.4)}
+  .strip{margin-top:14px;padding:12px 16px;border:1px dashed var(--border);border-radius:10px;color:var(--muted);font-size:13px}
+  .strip strong{color:var(--lgreen)}
+
+  /* ---- wire demo ---- */
+  .wire{position:relative;height:36px;overflow:hidden;background:#0d1117;border:1px solid var(--border);border-radius:8px;margin-bottom:10px}
+  .wire span{position:absolute;left:-14px;top:50%;margin-top:-5px;width:10px;height:10px;border-radius:50%;background:var(--green);animation:wslide 2.6s linear infinite}
+  .wire.wb span{background:var(--red);animation-duration:.55s}
+  @keyframes wslide{to{left:calc(100% + 14px)}}
+  .wirectl{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  #wirenote{font-size:12.5px;margin-top:10px}
+
+  /* ---- FAQ ---- */
+  details{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:10px}
+  details summary{cursor:pointer;font-size:14px;font-weight:600}
+  details p{color:var(--muted);font-size:13px;margin:10px 0 0}
+
+  /* ---- rabbitmq playground ---- */
+  .chip{display:inline-block;font:12px var(--mono);border:1px solid var(--border);border-radius:7px;padding:3px 10px;margin:0 6px 6px 0;background:var(--panel2)}
+  .chip.head{border-color:var(--green);color:var(--lgreen);font-weight:700}
+  .chip.dead{border-color:var(--red);color:#ff7b72;text-decoration:line-through}
+  .chip i{font-style:normal;color:var(--amber);margin-left:6px;font-size:10.5px}
+  .empty{color:var(--muted);font:12px var(--mono)}
+  .pgrow{margin:10px 0}
+  .pglabel{font:11px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+  .pgstats{display:flex;gap:18px;font:12px var(--mono);color:var(--muted);margin-top:8px}
+  .pgstats b{color:var(--lgreen)}
+  .pgstats .dlqn b{color:#ff7b72}
+
+  /* ---- schemas ---- */
+  pre{background:#0d1117;border:1px solid var(--border);border-radius:10px;padding:14px;overflow-x:auto;font:12.5px var(--mono);margin:0}
+  pre .c{color:var(--muted)}
+  pre .k{color:#7ee787}
+  pre .s{color:var(--amber)}
+  pre .n{color:var(--blue)}
+  .callout{border-radius:10px;padding:12px 16px;font-size:13px;margin-top:12px;border:1px solid}
+  .callout.amber{border-color:rgba(210,153,34,.5);background:rgba(210,153,34,.07)}
+  .callout.green{border-color:rgba(63,185,80,.5);background:rgba(63,185,80,.07)}
+  .callout b{color:var(--lgreen)}
+  .callout.amber b{color:var(--amber)}
+  footer{border-top:1px solid var(--border);margin-top:52px;padding:26px 0;color:var(--muted);font-size:13px}
+  footer ol{padding-left:20px}
+  footer li{margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <h1>Time Series Anomaly Service</h1>
+  <p>Architecture explorer — everything we discussed, made poke-able.</p>
+  <div class="tagchips">
+    <span class="tag">Java → RabbitMQ → Python worker → Snowflake</span>
+    <span class="tag">~1M time series</span>
+    <span class="tag">rolling z-score</span>
+    <span class="tag">single file · no dependencies</span>
+  </div>
+</header>
+
+<nav>
+  <div class="wrap">
+    <a href="#flow">01 Flow</a>
+    <a href="#lifecycle">02 Worker lifecycle</a>
+    <a href="#ab">03 SQL vs pandas</a>
+    <a href="#why">04 Why a service</a>
+    <a href="#rmq">05 RabbitMQ 101</a>
+    <a href="#conc">06 Concurrency</a>
+    <a href="#schemas">07 Messages</a>
+  </div>
+</nav>
+
+<!-- ============ 01 FLOW ============ -->
+<section id="flow" class="wrap">
+  <h2><span class="secno">01</span>The big picture</h2>
+  <p class="sub">Press a simulation, watch a message travel the system. Then click any component to inspect it.</p>
+
+  <div class="stagebox">
+  <svg id="stage" viewBox="0 0 980 480" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#8b949e"/>
+      </marker>
+    </defs>
+
+    <!-- arrows -->
+    <line class="arrow" x1="200" y1="72" x2="296" y2="72" marker-end="url(#arr)"/>
+    <text class="alabel" x="248" y="64">work order</text>
+    <line class="arrow" x1="470" y1="90" x2="556" y2="90" marker-end="url(#arr)"/>
+    <text class="alabel" x="513" y="80">consume</text>
+    <line class="arrow" x1="760" y1="88" x2="816" y2="88" marker-end="url(#arr)"/>
+    <text class="alabel" x="788" y="78">SQL</text>
+    <line class="arrow" x1="820" y1="140" x2="764" y2="140" marker-end="url(#arr)"/>
+    <text class="alabel" x="790" y="157">anomaly rows</text>
+    <path class="arrow" d="M660,180 L660,250 L385,250 L385,296" marker-end="url(#arr)"/>
+    <text class="alabel" x="522" y="243">result msg</text>
+    <path class="arrow" d="M300,340 L265,340 L265,110 L204,110" marker-end="url(#arr)"/>
+    <text class="alabel" x="305" y="232">result →</text>
+    <line class="arrow" x1="115" y1="130" x2="115" y2="296" marker-end="url(#arr)"/>
+    <text class="alabel" x="140" y="215">write</text>
+
+    <!-- nodes -->
+    <g id="g-java" class="node">
+      <rect x="30" y="50" width="170" height="80" rx="10"/>
+      <text class="ntitle" x="115" y="84">Java service</text>
+      <text class="nsub" x="115" y="104">producer · result consumer</text>
+    </g>
+    <g id="g-req" class="node">
+      <rect x="300" y="50" width="170" height="80" rx="10"/>
+      <text class="ntitle" x="385" y="84">requests</text>
+      <text class="nsub" x="385" y="104">RabbitMQ queue</text>
+      <circle class="qdot" cx="330" cy="116" r="3.5"/>
+      <circle class="qdot" cx="345" cy="116" r="3.5"/>
+      <circle class="qdot" cx="360" cy="116" r="3.5"/>
+    </g>
+    <g id="g-worker" class="node">
+      <rect x="560" y="50" width="200" height="130" rx="10"/>
+      <text class="ntitle" x="660" y="74">Python worker</text>
+      <text class="nsub" x="660" y="91">long-running consumer</text>
+      <text class="nstep" x="660" y="113">parse · validate</text>
+      <text class="nstep" x="660" y="129">resolve ids → chunks</text>
+      <text class="nstep" x="660" y="145">detect (SQL z-score)</text>
+      <text class="nstep" x="660" y="161">publish result · ack</text>
+    </g>
+    <g id="g-sf" class="node">
+      <rect x="820" y="60" width="130" height="100" rx="26"/>
+      <text class="ntitle" x="885" y="100">Snowflake</text>
+      <text class="nsub" x="885" y="118">rolling z-score in SQL</text>
+      <text class="nsub" x="885" y="133">window functions</text>
+    </g>
+    <g id="g-res" class="node">
+      <rect x="300" y="300" width="170" height="80" rx="10"/>
+      <text class="ntitle" x="385" y="334">results</text>
+      <text class="nsub" x="385" y="354">RabbitMQ queue</text>
+      <circle class="qdot" cx="330" cy="366" r="3.5"/>
+      <circle class="qdot" cx="345" cy="366" r="3.5"/>
+      <circle class="qdot" cx="360" cy="366" r="3.5"/>
+    </g>
+    <g id="g-db" class="node">
+      <rect x="30" y="300" width="170" height="80" rx="10"/>
+      <text class="ntitle" x="115" y="334">Database</text>
+      <text class="nsub" x="115" y="354">Java writes only</text>
+    </g>
+
+    <g id="crashbadge" style="display:none">
+      <rect x="585" y="150" width="150" height="26" rx="6" fill="#f85149"/>
+      <text x="660" y="167" text-anchor="middle" font-size="12" font-weight="700" fill="#0d1117">WORKER CRASHED</text>
+    </g>
+
+    <g id="dots"></g>
+  </svg>
+  </div>
+
+  <div class="ctl">
+    <button id="btn-happy" class="btn primary">Run · happy path</button>
+    <button id="btn-clean" class="btn">Run · no anomalies</button>
+    <button id="btn-crash" class="btn danger">Run · crash + redelivery</button>
+    <button id="btn-reset" class="btn">Reset</button>
+    <span class="spacer"></span>
+    <label class="stepmode"><input type="checkbox" id="chk-step"> step-by-step</label>
+    <button id="btn-next" class="btn primary" disabled>Next →</button>
+  </div>
+
+  <div id="caption" class="cap">Press "Run" to watch a request travel the system — or tick "step-by-step" and advance each step with Next. The crash simulation shows why acks make it crash-safe.</div>
+
+  <div class="panel ndet">
+    <h4 id="nd-title">Click a component in the diagram</h4>
+    <p id="nd-body">Each box has a story: what it owns, what it must never do, and where it can fail.</p>
+  </div>
+  <p class="hint">Tip: the worker never writes to the Database — Java owns persistence. That is what keeps the storage decision reversible.</p>
+</section>
+
+<!-- ============ 02 LIFECYCLE ============ -->
+<section id="lifecycle" class="wrap">
+  <h2><span class="secno">02</span>Worker lifecycle — one message, step by step</h2>
+  <p class="sub">What happens between "message arrives" and "loop back". Each step includes what can go wrong.</p>
+  <div class="panel">
+    <div class="st-top"><span id="st-count">1 / 8</span><strong id="st-title"></strong></div>
+    <p id="st-body"></p>
+    <p id="st-risk" class="risk"></p>
+    <div class="st-nav">
+      <button id="st-prev" class="btn">← Prev</button>
+      <button id="st-next" class="btn primary">Next →</button>
+    </div>
+    <div id="st-dots" class="stdots"></div>
+  </div>
+</section>
+
+<!-- ============ 03 A vs B ============ -->
+<section id="ab" class="wrap">
+  <h2><span class="secno">03</span>Where should the math happen?</h2>
+  <p class="sub">Your Snowflake test (100k series, 14-day rolling z-score, 2–3 s) proved the compute can stay inside Snowflake. Compare the two worlds:</p>
+  <div class="grid2">
+    <div class="card good">
+      <span class="pill g">recommended today</span>
+      <h3>A — Compute inside Snowflake</h3>
+      <p class="tagline">rolling z-score = SQL window functions (AVG / STDDEV OVER)</p>
+      <ul>
+        <li>~2–3 s per 100k series → <b>~30 s per million</b></li>
+        <li>Over the wire: <b>anomaly rows only</b> — a handful per chunk</li>
+        <li>Worker RAM: tiny — batch size stops being a safety issue</li>
+        <li>Concurrency: plain asyncio (your chef only waits)</li>
+        <li>Limitation: only algorithms SQL can express</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="pill a">when you outgrow SQL</span>
+      <h3>B — Pull raw data, compute in pandas</h3>
+      <p class="tagline">any algorithm: STL, Prophet, sklearn, custom models</p>
+      <ul>
+        <li>Over the wire: <b>every raw data point</b> of every series</li>
+        <li>Worker RAM: large — batch sizing becomes a real safety concern</li>
+        <li>Concurrency: process pools to dodge the GIL</li>
+        <li>Slower end-to-end; more moving parts to tune</li>
+        <li>Payoff: unlimited algorithm freedom</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:14px">
+    <div class="pglabel" style="margin-bottom:10px">what travels between worker and snowflake</div>
+    <div id="wire" class="wire"></div>
+    <div class="wirectl">
+      <button id="wA" class="btn active">A · SQL pushdown</button>
+      <button id="wB" class="btn">B · raw pull</button>
+    </div>
+    <p id="wirenote" class="muted"></p>
+  </div>
+
+  <div class="strip">Start with <strong>A</strong> behind a swappable detector interface. <strong>B</strong> then becomes a module you add later — not a rewrite.</div>
+</section>
+
+<!-- ============ 04 WHY A SERVICE ============ -->
+<section id="why" class="wrap">
+  <h2><span class="secno">04</span>"If Snowflake does the math, why a Python service at all?"</h2>
+  <p class="sub">Fair question. Snowflake <i>could</i> host everything: Snowpark runs Python inside it, Tasks schedule it, built-in ML functions even do anomaly detection. Here is the honest tradeoff analysis.</p>
+
+  <details open>
+    <summary>So what does the Python service actually do today?</summary>
+    <p>Translate work orders into SQL, chunk the series set, own retries and error handling, publish results, and be the future home for algorithms that outgrow SQL. Yes — today it is thin glue. That is fine. Its job is to be the <b>seam</b>: algorithm changes ship without touching Java, and Java changes ship without touching the math.</p>
+  </details>
+  <details>
+    <summary>"Java could just call a Snowflake stored procedure" — why not?</summary>
+    <p>Technically possible. But: (1) <b>orchestration</b> — you already have Java + RabbitMQ; Snowflake Tasks would add a second scheduling world with its own failure modes; (2) <b>cost</b> — warehouses bill per second while spinning, pods on the existing K8s cluster are flat cost; (3) <b>deploys</b> — algorithm changes would ship via SQL migrations and admin permissions instead of normal CI/CD with rollback; (4) <b>ownership</b> — the anomaly logic gets one clear owner instead of living in DB-admin land.</p>
+  </details>
+  <details>
+    <summary>Could a notebook be the service?</summary>
+    <p>Notebooks (including Snowflake Notebooks) are exploration tools: no consumers, no health checks, no deploy or rollback story, no alerting. Prototype the SQL there — productionize in the service.</p>
+  </details>
+  <details>
+    <summary>When would all-in-Snowflake actually be right?</summary>
+    <p>A fixed SQL job on a schedule, no external orchestration, small team — then a Snowflake Task is genuinely the clean answer. You are not in that world: you already have a broker, a Java service, and a K8s cluster.</p>
+  </details>
+  <details>
+    <summary>What about future ML — doesn't Snowflake have that too?</summary>
+    <p>Snowpark ML exists and is decent. But iteration speed, library freedom, and local testing live better in your own service. And with the swappable detector interface it is not either/or: a SnowparkML detector can sit behind the same contract if that ever wins on cost or data locality.</p>
+  </details>
+</section>
+
+<!-- ============ 05 RABBITMQ 101 ============ -->
+<section id="rmq" class="wrap">
+  <h2><span class="secno">05</span>RabbitMQ in five ideas</h2>
+  <p class="sub">Everything you actually need, minus the buzzwords.</p>
+  <div class="grid3">
+    <div class="card">
+      <span class="pill b">structure</span>
+      <h3>Queue = mailbox</h3>
+      <p class="tagline">with a conveyor belt</p>
+      <ul><li>Messages (JSON bytes) wait in order until someone takes them</li><li>Java drops letters in; you take them out</li></ul>
+    </div>
+    <div class="card">
+      <span class="pill g">safety</span>
+      <h3>Ack = signed receipt</h3>
+      <p class="tagline">"finished — you may destroy it"</p>
+      <ul><li>Only sent after the result is published</li><li>No receipt (crash)? Letter goes back on the belt for another worker</li></ul>
+    </div>
+    <div class="card">
+      <span class="pill b">fairness</span>
+      <h3>prefetch</h3>
+      <p class="tagline">"at most 10 letters at a time"</p>
+      <ul><li>A slow worker cannot hoard the mailbox</li><li>Messages keep flowing to healthy workers</li></ul>
+    </div>
+    <div class="card">
+      <span class="pill r">failure</span>
+      <h3>DLQ = failed-orders bin</h3>
+      <p class="tagline">3 strikes and you are out</p>
+      <ul><li>Messages that keep failing are parked, not retried forever</li><li>One poison message can never block a worker</li></ul>
+    </div>
+    <div class="card">
+      <span class="pill b">routing</span>
+      <h3>Exchange = sorting desk</h3>
+      <p class="tagline">the post office, not your problem</p>
+      <ul><li>Java publishes to an exchange; a routing key decides the queue</li><li>You mostly just consume from a queue name</li></ul>
+    </div>
+    <div class="card good">
+      <span class="pill g">rule of thumb</span>
+      <h3>Keep messages small</h3>
+      <p class="tagline">brokers hate multi-MB payloads</p>
+      <ul><li>Your results fit fine in messages</li><li>If they ever grow huge: write to S3, send a pointer</li></ul>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:14px">
+    <div class="pglabel">playground — try ack vs nack yourself</div>
+    <div class="pgrow">
+      <div class="pglabel">queue (▸ = next to process)</div>
+      <div id="pg-queue"></div>
+    </div>
+    <div class="pgrow">
+      <div class="pglabel">dead-letter queue</div>
+      <div id="pg-dlq"></div>
+    </div>
+    <div class="ctl">
+      <button id="pg-ok" class="btn primary">Process head · OK (ack)</button>
+      <button id="pg-fail" class="btn danger">Process head · FAIL (nack)</button>
+      <button id="pg-reset" class="btn">Reset</button>
+    </div>
+    <div class="pgstats">
+      <span>acked (done): <b id="pg-done">0</b></span>
+      <span class="dlqn">dead-lettered: <b id="pg-dlqn">0</b></span>
+    </div>
+    <p class="hint">FAIL = nack: the message goes back for another attempt (watch the try counter). After 3 strikes it is dead-lettered — so a broken message can never block the queue.</p>
+  </div>
+</section>
+
+<!-- ============ 06 CONCURRENCY ============ -->
+<section id="conc" class="wrap">
+  <h2><span class="secno">06</span>Concurrency — the one-chef kitchen</h2>
+  <p class="sub">Why threads never speed up your math, and why SQL pushdown makes it all moot.</p>
+  <div class="grid3">
+    <div class="card">
+      <span class="pill">the process</span>
+      <h3>One chef</h3>
+      <p class="tagline">your Python process</p>
+      <ul><li>One set of hands, one brain</li><li>Everything below is about working around this</li></ul>
+    </div>
+    <div class="card">
+      <span class="pill b">waiting · I/O</span>
+      <h3>Many pots — asyncio</h3>
+      <p class="tagline">five pots simmering at once</p>
+      <ul><li>Great when work = waiting (Snowflake, RabbitMQ)</li><li>Chef is free while pots simmer</li></ul>
+    </div>
+    <div class="card">
+      <span class="pill r">compute · GIL</span>
+      <h3>The one-knife rule</h3>
+      <p class="tagline">only one hand may hold the knife</p>
+      <ul><li>Threads never speed up chopping (CPU math, pandas)</li><li>The GIL enforces it, always</li></ul>
+    </div>
+    <div class="card">
+      <span class="pill a">CPU parallelism</span>
+      <h3>More chefs — processes</h3>
+      <p class="tagline">ProcessPoolExecutor</p>
+      <ul><li>Actual extra chefs, separate memory each</li><li>The only way to parallelize CPU work in one pod</li></ul>
+    </div>
+    <div class="card">
+      <span class="pill g">scale-out</span>
+      <h3>More kitchens — replicas</h3>
+      <p class="tagline">K8s just adds pods</p>
+      <ul><li>Zero code changes</li><li>RabbitMQ spreads messages across replicas automatically</li></ul>
+    </div>
+    <div class="card good">
+      <span class="pill g">your situation</span>
+      <h3>SQL pushdown = mostly waiting</h3>
+      <p class="tagline">the chef barely chops</p>
+      <ul><li>Plain asyncio is enough</li><li>The one-knife rule never bites you</li></ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 07 SCHEMAS ============ -->
+<section id="schemas" class="wrap">
+  <h2><span class="secno">07</span>The messages — the contract with Java</h2>
+  <p class="sub">Small, explicit, and always answered. Sign these off with the Java team before coding.</p>
+  <div class="grid2">
+    <div>
+      <div class="pglabel">requests queue · from Java</div>
+      <pre><span class="c">// today: just this — which is a problem (see below)</span>
+{
+  <span class="k">"request_id"</span>: <span class="s">"req-331"</span>
+}</pre>
+    </div>
+    <div>
+      <div class="pglabel">results queue · from Python — always sent</div>
+      <pre>{
+  <span class="k">"request_id"</span>: <span class="s">"req-331"</span>,
+  <span class="k">"status"</span>: <span class="s">"anomalies_found"</span>, <span class="c">// or "no_anomalies"</span>
+  <span class="k">"computed_at"</span>: <span class="s">"2026-09-20T09:01:22Z"</span>,
+  <span class="k">"anomalies"</span>: [
+    {
+      <span class="k">"series_id"</span>: <span class="s">"temp-line7-hourly"</span>,
+      <span class="k">"ts"</span>: <span class="s">"2026-09-19T14:00:00Z"</span>,
+      <span class="k">"value"</span>: <span class="n">92.4</span>,
+      <span class="k">"rolling_mean"</span>: <span class="n">71.2</span>,
+      <span class="k">"rolling_std"</span>: <span class="n">6.1</span>,
+      <span class="k">"zscore"</span>: <span class="n">3.48</span>,
+      <span class="k">"window"</span>: <span class="n">14</span>
+    }
+  ]
+}</pre>
+    </div>
+  </div>
+  <div class="callout amber"><b>Open question #1:</b> <code>request_id</code> alone does not say WHICH series. Something must resolve it — recommended: a shared request-registry table (Java writes the scope when creating the request; Python reads it). Alternatives: self-describing IDs (fragile) or scope-in-message (Java said no). Settle this with the Java team first.</div>
+  <div class="callout green"><b>Always respond:</b> even "no_anomalies" gets a message. Silence is ambiguous — done? crashed? lost? Explicit beats implicit, always. And keep result messages small; if full series must ever be attached, switch to S3 + a pointer message.</div>
+</section>
+
+<footer class="wrap">
+  <h2 style="font-size:16px">Open questions before you code</h2>
+  <ol>
+    <li>How does <code>request_id</code> resolve to a series set? (shared registry table — settle with Java)</li>
+    <li>Sign off the result schema: status values, anomaly fields, does Java really need the full series?</li>
+    <li>Which warehouse size produced the 2–3 s test? Does it auto-suspend (cold start adds ~10–20 s)?</li>
+    <li>Chunk size: start at ~10k series per query, tune from dev metrics — do not theorize.</li>
+  </ol>
+  <p style="margin-top:14px">Next step: scaffold the real project — consumer loop, detector interface, Snowflake SQL, tests with fakes. </p>
+</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const dotsLayer = $('dots');
+
+/* ---------- geometry helpers ---------- */
+function svgEl(tag, attrs){
+  const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+function segLen(a,b){ return Math.hypot(b[0]-a[0], b[1]-a[1]); }
+function pathLen(pts){ let L=0; for(let i=1;i<pts.length;i++) L+=segLen(pts[i-1],pts[i]); return L; }
+function pointAt(pts, d){
+  let acc=0;
+  for(let i=1;i<pts.length;i++){
+    const l=segLen(pts[i-1],pts[i]);
+    if(d<=acc+l){
+      const t=(d-acc)/l;
+      return [pts[i-1][0]+(pts[i][0]-pts[i-1][0])*t, pts[i-1][1]+(pts[i][1]-pts[i-1][1])*t];
+    }
+    acc+=l;
+  }
+  return pts[pts.length-1];
+}
+
+/* waypoint polylines (match the arrows) */
+const W = {
+  w1: [[200,72],[296,72]],
+  w2: [[470,90],[556,90]],
+  w3: [[760,88],[816,88]],
+  w4: [[820,140],[764,140]],
+  w5: [[660,180],[660,250],[385,250],[385,296]],
+  w6: [[300,340],[265,340],[265,110],[204,110]],
+  w7: [[115,130],[115,296]]
+};
+
+function travel(pts, opts){
+  const o = Object.assign({color:'#3fb950', r:7, speed:0.2, delay:0}, opts||{});
+  return new Promise(res => {
+    const c = svgEl('circle', {r:o.r, fill:o.color});
+    dotsLayer.appendChild(c);
+    const total = pathLen(pts), dur = total / o.speed;
+    let start = null;
+    function frame(now){
+      if(start === null) start = now + o.delay;
+      if(now < start){ requestAnimationFrame(frame); return; }
+      const t = Math.min(1, (now - start) / dur);
+      const p = pointAt(pts, t * total);
+      c.setAttribute('cx', p[0]); c.setAttribute('cy', p[1]);
+      if(t < 1) requestAnimationFrame(frame);
+      else { c.remove(); res(); }
+    }
+    requestAnimationFrame(frame);
+  });
+}
+
+/* ---------- lights / crash / caption ---------- */
+const NODES = ['g-java','g-req','g-worker','g-sf','g-res','g-db'];
+function light(id, on){ $(id).classList.toggle('lit', !!on); }
+function allOff(){
+  NODES.forEach(n => $(n).classList.remove('lit','crashed','sel'));
+  $('crashbadge').style.display = 'none';
+}
+function clearDots(){ dotsLayer.innerHTML = ''; }
+function crash(){
+  $('g-worker').classList.add('crashed');
+  $('crashbadge').style.display = '';
+}
+function unCrash(){
+  $('g-worker').classList.remove('crashed');
+  $('crashbadge').style.display = 'none';
+}
+function say(text, tone){
+  const c = $('caption');
+  c.textContent = text;
+  c.className = 'cap' + (tone ? ' ' + tone : '');
+}
+
+let running = false;
+function setBtns(){ ['btn-happy','btn-clean','btn-crash'].forEach(b => $(b).disabled = running); }
+function updateNext(){
+  const active = flow && !flow.finished && !flow.busy && $('chk-step').checked;
+  $('btn-next').disabled = !active;
+  $('btn-next').classList.toggle('pulse', !!active);
+}
+
+/* ---------- flow simulations (auto runs unchanged + optional step-by-step) ---------- */
+let flow = null;   // {steps, idx, mode, gen, busy, finished}
+let gen = 0;       // bump to cancel orphaned async chains on reset/restart
+
+function buildSteps(mode){
+  const S = [];
+  S.push({cap:'Java publishes a work order: {"request_id": "req-331"}',
+    run:async()=>{ light('g-java',1); await travel(W.w1); }});
+  S.push({cap:'Worker picks it up. The message is STILL stored in the queue — nothing has been acked yet.',
+    run:async()=>{ light('g-java',0); light('g-req',1); light('g-worker',1); await travel(W.w2); }});
+  S.push({cap:'Worker sends SQL. The rolling z-score is computed INSIDE Snowflake — window functions, not Python.',
+    run:async()=>{ light('g-sf',1); await travel(W.w3); }});
+  if(mode === 'crash'){
+    S.push({cap:'Worker CRASHED mid-processing — before acking!', tone:'err',
+      run:async()=>{ light('g-worker',0); crash(); await sleep(1300); }});
+    S.push({cap:'No ack was ever sent, so the request is still safely stored in the queue…', tone:'warn',
+      run:async()=>{ light('g-req',1); await sleep(1100); }});
+    S.push({cap:'RabbitMQ redelivers the same message to a healthy worker — same input, same output (idempotent).', tone:'warn',
+      run:async()=>{ unCrash(); light('g-worker',1); await travel(W.w2); }});
+    S.push({cap:'The new worker re-runs the SQL. Nothing was lost.',
+      run:async()=>{ await travel(W.w3); }});
+  }
+  if(mode === 'clean'){
+    S.push({cap:'No row crosses the z-threshold. Zero rows travel back.',
+      run:async()=>{ light('g-sf',0); await sleep(900); }});
+  } else {
+    S.push({cap:'Only the anomaly rows travel back — a tiny payload, never the raw series.',
+      run:async()=>{ light('g-sf',0); await Promise.all([
+        travel(W.w4, {color:'#d29922', r:5, delay:0}),
+        travel(W.w4, {color:'#d29922', r:5, delay:200}),
+        travel(W.w4, {color:'#d29922', r:5, delay:400})]); }});
+  }
+  S.push({cap:(mode === 'clean'
+      ? 'Worker publishes the result: status "no_anomalies". It ALWAYS responds — silence would be ambiguous.'
+      : 'Worker publishes the result: status "anomalies_found", with the anomaly rows.'),
+    run:async()=>{ light('g-res',1); await travel(W.w5); }});
+  S.push({cap:'Only NOW does the worker ack the request — RabbitMQ deletes it.' +
+      (mode === 'crash' ? ' This is why the earlier crash was safe.' : ' A crash before this point means safe redelivery.'),
+    run:async()=>{ light('g-req',0); await sleep(1100); }});
+  S.push({cap:'Java consumes the result and writes the anomalies to the DB.',
+    run:async()=>{ light('g-res',0); light('g-java',1); await travel(W.w6); await travel(W.w7, {color:'#58a6ff'}); light('g-db',1); }});
+  return S;
+}
+
+function finalMsg(mode){
+  return (mode === 'clean'
+    ? 'Done — Java recorded "no anomalies" for req-331. Every request gets an answer; no silent gaps.'
+    : 'Done — anomaly rows written to the DB. Python never touched the database.');
+}
+
+function startFlow(mode){
+  if(flow && !flow.finished) return;
+  gen++;
+  running = true; setBtns();
+  clearDots(); allOff();
+  flow = { steps: buildSteps(mode), idx: -1, mode, gen, busy: false, finished: false };
+  advance();
+}
+
+async function advance(){
+  if(!flow || flow.busy || flow.finished) return;
+  const mygen = flow.gen;
+  flow.busy = true; updateNext();
+  flow.idx++;
+  const s = flow.steps[flow.idx];
+  say((flow.idx + 1) + '/' + flow.steps.length + ' · ' + s.cap, s.tone);
+  await s.run();
+  if(!flow || flow.gen !== mygen) return;   // cancelled mid-step
+  flow.busy = false;
+  if(flow.idx >= flow.steps.length - 1){
+    flow.finished = true; running = false; setBtns(); updateNext();
+    say(finalMsg(flow.mode));
+    await sleep(2400);
+    if(!flow || flow.gen !== mygen) return;
+    allOff(); flow = null; updateNext();
+    say('Press Run to simulate again — tick "step-by-step" to advance each step with Next.');
+    return;
+  }
+  if($('chk-step').checked){
+    updateNext();                            // manual: wait for the Next click
+  } else {
+    await sleep(900);
+    if(!flow || flow.gen !== mygen) return;
+    advance();
+  }
+}
+
+$('btn-happy').onclick = () => startFlow('happy');
+$('btn-clean').onclick = () => startFlow('clean');
+$('btn-crash').onclick = () => startFlow('crash');
+$('btn-next').onclick  = () => advance();
+$('btn-reset').onclick = () => {
+  gen++; flow = null; running = false;
+  clearDots(); allOff(); setBtns(); updateNext();
+  say('Press "Run" to watch a request travel the system — or tick "step-by-step" and advance each step with Next.');
+};
+
+/* ---------- node inspector ---------- */
+const INFO = {
+  'g-java': ['Java service',
+    'Publishes work orders to the requests queue and consumes results. Owns ALL database writes. Knows nothing about z-scores, Snowflake, or how the math works — a clean ownership boundary.'],
+  'g-req': ['requests queue (RabbitMQ)',
+    'The mailbox. Holds work orders until a consumer acks them. prefetch limits how many one worker can grab at once; messages that fail repeatedly are dead-lettered (DLQ) instead of blocking anyone.'],
+  'g-worker': ['Python worker',
+    'The long-running consumer: grab → parse → resolve → detect → publish → ack, in a while-true loop. Also serves a tiny /healthz endpoint for Kubernetes. Holds no state between messages — any replica can handle any request.'],
+  'g-sf': ['Snowflake',
+    'Does the heavy lifting: rolling z-score via SQL window functions (AVG / STDDEV OVER ... ROWS BETWEEN 13 PRECEDING AND CURRENT ROW). The worker sends a chunk of series IDs and gets back only rows where |z| > threshold.'],
+  'g-res': ['results queue (RabbitMQ)',
+    'Carries small JSON result messages back to Java. Kept small on purpose — brokers get slow with multi-MB payloads. (If results ever grow huge: write to S3, send a pointer message instead.)'],
+  'g-db': ['Database',
+    'Written only by Java, from result messages. Python never connects to it — which is exactly what keeps the "who persists the results" decision reversible.']
+};
+NODES.forEach(n => {
+  $(n).addEventListener('click', () => {
+    NODES.forEach(x => $(x).classList.remove('sel'));
+    $(n).classList.add('sel');
+    $('nd-title').textContent = INFO[n][0];
+    $('nd-body').textContent = INFO[n][1];
+  });
+});
+
+/* ---------- lifecycle stepper ---------- */
+const STEPS = [
+  {t:'Message arrives',
+   b:'Raw JSON bytes come off the requests queue: {"request_id":"req-331"}. The worker holds it un-acked — it still belongs to the queue.',
+   r:'Nothing yet — the message is safely stored in RabbitMQ.'},
+  {t:'Parse & validate',
+   b:'Decode the JSON, check required fields. A malformed message is rejected straight to the DLQ — never retried. Retrying garbage just fails forever.',
+   r:'Poison messages would otherwise trap a worker in an infinite retry loop.'},
+  {t:'Resolve request_id → series set',
+   b:'Look up what this request means (shared request-registry table — the contract to settle with Java). Split the series into chunks of ~10k.',
+   r:'Registry row missing? Nack to DLQ and alert — do not guess.'},
+  {t:'Run detection (per chunk)',
+   b:'One SQL query per chunk: rolling z-score via window functions. The compute stays inside Snowflake; only IDs go in.',
+   r:'Transient Snowflake errors → retry with backoff a couple of times, then DLQ the request.'},
+  {t:'Collect anomalies',
+   b:'Only rows where |z| > threshold come back — usually a handful per chunk. Tiny payload, tiny memory.',
+   r:'A pathological batch (everything anomalous) must still fit in memory — bound it.'},
+  {t:'Publish result — always',
+   b:'{request_id, status, anomalies[]} goes to the results queue. Even "no_anomalies" gets a message — silence is ambiguous.',
+   r:'Publish failed? Do NOT ack — the request will be redelivered and reprocessed (keep it idempotent).'},
+  {t:'Ack the request',
+   b:'The signed receipt. RabbitMQ deletes the message. This is the commit point of the entire loop.',
+   r:'Crash before this = safe redelivery. Crash after = done (Java dedupes by request_id if needed).'},
+  {t:'Loop',
+   b:'Grab the next message. That while-true loop IS the service. Meanwhile /healthz keeps answering Kubernetes: "still alive".',
+   r:'A silently stuck loop is invisible without metrics — hence queue-depth and latency monitoring.'}
+];
+let si = 0;
+function stRender(){
+  const s = STEPS[si];
+  $('st-count').textContent = (si+1) + ' / ' + STEPS.length;
+  $('st-title').textContent = s.t;
+  $('st-body').textContent = s.b;
+  $('st-risk').textContent = 'Watch out: ' + s.r;
+  $('st-prev').disabled = si === 0;
+  $('st-next').disabled = si === STEPS.length - 1;
+  const d = $('st-dots'); d.innerHTML = '';
+  STEPS.forEach((_, i) => {
+    const b = document.createElement('button');
+    b.className = 'stdot' + (i === si ? ' on' : '');
+    b.onclick = () => { si = i; stRender(); };
+    d.appendChild(b);
+  });
+}
+$('st-prev').onclick = () => { if(si > 0){ si--; stRender(); } };
+$('st-next').onclick = () => { if(si < STEPS.length - 1){ si++; stRender(); } };
+stRender();
+
+/* ---------- wire demo (A vs B) ---------- */
+function setWire(mode){
+  const wire = $('wire');
+  wire.className = 'wire' + (mode === 'b' ? ' wb' : '');
+  wire.innerHTML = '';
+  const n = mode === 'a' ? 3 : 20;
+  for(let i = 0; i < n; i++){
+    const s = document.createElement('span');
+    s.style.animationDelay = (i * (mode === 'a' ? 0.9 : 0.14)) + 's';
+    wire.appendChild(s);
+  }
+  $('wA').classList.toggle('active', mode === 'a');
+  $('wB').classList.toggle('active', mode === 'b');
+  $('wirenote').textContent = mode === 'a'
+    ? 'Mode A: only anomaly rows cross the wire — a handful of small rows per chunk.'
+    : 'Mode B: the worker pulls raw data for every series — millions of rows over the network, big RAM, process pools needed.';
+}
+$('wA').onclick = () => setWire('a');
+$('wB').onclick = () => setWire('b');
+setWire('a');
+
+/* ---------- rabbitmq playground ---------- */
+let pq, pdlq, doneN;
+function pgReset(){
+  pq = [101,102,103,104,105].map(n => ({id:'req-' + n, tries:0}));
+  pdlq = []; doneN = 0;
+  pgRender();
+}
+function chip(m, isHead, dead){
+  const c = document.createElement('span');
+  c.className = 'chip' + (isHead ? ' head' : '') + (dead ? ' dead' : '');
+  c.textContent = (isHead ? '\u25B8 ' : '') + m.id;
+  if(m.tries > 0 && !dead){
+    const b = document.createElement('i');
+    b.textContent = 'try ' + (m.tries + 1) + '/3';
+    c.appendChild(b);
+  }
+  if(dead){
+    const b = document.createElement('i');
+    b.textContent = '\u00D73';
+    c.appendChild(b);
+  }
+  return c;
+}
+function pgRender(){
+  const q = $('pg-queue'); q.innerHTML = '';
+  if(!pq.length) q.innerHTML = '<span class="empty">queue empty — every message resolved</span>';
+  pq.forEach((m, i) => q.appendChild(chip(m, i === 0, false)));
+  const d = $('pg-dlq'); d.innerHTML = '';
+  if(!pdlq.length) d.innerHTML = '<span class="empty">nothing dead-lettered</span>';
+  pdlq.forEach(m => d.appendChild(chip(m, false, true)));
+  $('pg-done').textContent = doneN;
+  $('pg-dlqn').textContent = pdlq.length;
+}
+$('pg-ok').onclick = () => { if(pq.length){ pq.shift(); doneN++; pgRender(); } };
+$('pg-fail').onclick = () => {
+  if(!pq.length) return;
+  pq[0].tries++;
+  if(pq[0].tries >= 3){ pdlq.push(pq.shift()); }
+  pgRender();
+};
+$('pg-reset').onclick = pgReset;
+pgReset();
+</script>
+</body>
+</html>
